@@ -20,9 +20,9 @@ String currentDir = "";
 GStepper<STEPPER4WIRE> stepper(2048, motorPin4, motorPin2, motorPin3, motorPin1); // мотор с драйвером ULN2003 подключается по порядку пинов, но крайние нужно поменять местами
 Encoder encoder(encoderCLK, encoderDT, encoderSW, TYPE2);  // для работы c кнопкой и сразу выбираем тип
 
-float axeleration = 100.0;	// ускорение при старте и стопе
 float speed = 200.0;	// скорость вращения при "передвижении" влево/вправо
 float trackingSpeed = 50.0;	// скорость при "трекинге"
+float axeleration = 100.0;	// ускорение при старте и стопе
 
 //enum Modes
 //{
@@ -51,11 +51,11 @@ void setup()
 
 void initVars() {
 	int eeAddress = 0; //EEPROM address to start reading from
-	axeleration = EEPROM.read(eeAddress);
-	eeAddress += sizeof(float);
 	speed = EEPROM.read(eeAddress);
 	eeAddress += sizeof(float);
 	trackingSpeed = EEPROM.read(eeAddress);
+	eeAddress += sizeof(float);
+	axeleration = EEPROM.read(eeAddress);
 	eeAddress += sizeof(float);
 
 	Serial.print("axeleration = ");
@@ -120,7 +120,10 @@ void initTimers() {
 
 void initStepper() {
 	stepper.setMaxSpeed(MAX_SPEED);
+	stepper.autoPower(true);
 	stepper.setAcceleration(axeleration);
+
+	stepper.setMaxSpeed(MAX_SPEED);
 	stepper.setSpeed(speed);
 }
 
@@ -137,11 +140,11 @@ void timer_handle_interrupts(int timer) {
 
 			digitalWrite(LED_BUILTIN, LOW);
 			isBlink = false;
-
-			Serial.println(trackingSpeed);
 		}
 	}
 }
+
+byte isMoving = false;
 
 void loop()
 {
@@ -152,19 +155,16 @@ void loop()
 
 	if (encoder.isRight()) {
 		Serial.println("Right");         // если был поворот
-		
-		/*stepper.stop();
-		stepper.setRunMode(FOLLOW_POS);*/
-		stepper.setSpeed(speed);
-		stepper.setTarget(25, RELATIVE);
+
+		stepper.setRunMode(FOLLOW_POS);
+		stepper.setTarget(30, RELATIVE);
 	}
 	if (encoder.isLeft()) {
 		Serial.println("Left");
-		
-		/*stepper.stop();
-		stepper.setRunMode(FOLLOW_POS);*/
-		stepper.setSpeed(speed);
-		stepper.setTarget(-25, RELATIVE);
+
+		stepper.setRunMode(FOLLOW_POS);
+		stepper.setTarget(-30, RELATIVE);
+
 	}
 
 	if (encoder.isRightH())
@@ -172,12 +172,14 @@ void loop()
 		Serial.println("Right holded"); // если было удержание + поворот
 
 		trackingSpeed++;
+		stepper.setSpeed(trackingSpeed);
 	}
 	if (encoder.isLeftH())
 	{
 		Serial.println("Left holded");
 
 		trackingSpeed--;
+		stepper.setSpeed(trackingSpeed);
 	}
 
 	//if (enc1.isPress()) Serial.println("Press");         // нажатие на кнопку (+ дебаунс)
@@ -202,12 +204,11 @@ void loop()
 		stepper.setSpeed(-trackingSpeed);
 	}
 
-
 	if (encoder.isHolded()) {
 		Serial.println("Holded");       // если была удержана и энк не поворачивался
 		saveVars();
 	}
 	//if (enc1.isHold()) Serial.println("Hold");         // возвращает состояние кнопки
 
-	stepper.tick();
+	isMoving = stepper.tick();
 }
