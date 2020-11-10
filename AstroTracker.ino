@@ -10,7 +10,6 @@
 #define motorPin2 7	// 28BYJ48 pin 2
 #define motorPin3 8	// 28BYJ48 pin 3
 #define motorPin4 9	// 28BYJ48 pin 4
-#define STEPS_PER_REVOLUTION_HALF4WIRE    2048
 #define MAX_SPEED   1000.0
 
 int counter = 0;
@@ -18,46 +17,71 @@ int currentStateCLK;
 int lastStateCLK;
 String currentDir = "";
 
-GStepper<STEPPER4WIRE> stepper(STEPS_PER_REVOLUTION_HALF4WIRE, motorPin4, motorPin2, motorPin3, motorPin1);
-// мотор с драйвером ULN2003 подключается по порядку пинов, но крайние нужно поменять местами
-// то есть у меня подключено D2-IN1, D3-IN2, D4-IN3, D5-IN4, но в программе поменял 5 и 2
-
+GStepper<STEPPER4WIRE> stepper(2048, motorPin4, motorPin2, motorPin3, motorPin1); // мотор с драйвером ULN2003 подключается по порядку пинов, но крайние нужно поменять местами
 Encoder encoder(encoderCLK, encoderDT, encoderSW, TYPE2);  // для работы c кнопкой и сразу выбираем тип
 
-float axeleration = 100.0;
-float speed = 200.0;
-float trackingSpeed = 50.0;
+float axeleration = 100.0;	// ускорение при старте и стопе
+float speed = 200.0;	// скорость вращения при "передвижении" влево/вправо
+float trackingSpeed = 50.0;	// скорость при "трекинге"
 
-enum Modes
-{
-	IDDLE,
-	LEFT,
-	RIGHT,
-	/*TOP,
-	DOWN,*/
-	TRACKING,
-};
+//enum Modes
+//{
+//	IDDLE,
+//	LEFT,
+//	RIGHT,
+//	/*TOP,
+//	DOWN,*/
+//	TRACKING,
+//};
 
-Modes mode = Modes::IDDLE;
-byte isBlink = false;
-const int trackingSpeedEepromAddress = 0;
+//Modes mode = Modes::IDDLE;
+byte isBlink = false;	// флаг моргания светодиодом
 
 void setup()
 {
+	Serial.println("Init...");
+
 	Serial.begin(115200);
 
 	initVars();
 	initButtons();
 	initTimers();
 	initStepper();
-	
-	Serial.println("Init...");
+}
+
+void initVars() {
+	int eeAddress = 0; //EEPROM address to start reading from
+	axeleration = EEPROM.read(eeAddress);
+	eeAddress += sizeof(float);
+	speed = EEPROM.read(eeAddress);
+	eeAddress += sizeof(float);
+	trackingSpeed = EEPROM.read(eeAddress);
+	eeAddress += sizeof(float);
+
+	Serial.print("axeleration = ");
+	Serial.println(axeleration);
+	Serial.print("speed = ");
+	Serial.println(speed);
 	Serial.print("trackingSpeed = ");
 	Serial.println(trackingSpeed);
 }
 
-void initVars() {
-	trackingSpeed = EEPROM.read(trackingSpeedEepromAddress);
+void saveVars() {
+	int eeAddress = 0; //EEPROM address to start reading from
+	EEPROM.write(eeAddress, axeleration);
+	eeAddress += sizeof(float);
+	EEPROM.write(eeAddress, speed);
+	eeAddress += sizeof(float);
+	EEPROM.write(eeAddress, trackingSpeed);
+	eeAddress += sizeof(float);
+
+	Serial.print("axeleration = ");
+	Serial.println(axeleration);
+	Serial.print("speed = ");
+	Serial.println(speed);
+	Serial.print("trackingSpeed = ");
+	Serial.println(trackingSpeed);
+	Serial.println("Saved!");
 }
 
 void isrCLK() {
@@ -68,7 +92,7 @@ void isrDT() {
 }
 
 void initButtons() {
-	pinMode(LED_BUILTIN, OUTPUT);	
+	pinMode(LED_BUILTIN, OUTPUT);
 	attachInterrupt(0, isrCLK, CHANGE);
 	attachInterrupt(1, isrDT, CHANGE);
 }
@@ -128,22 +152,32 @@ void loop()
 
 	if (encoder.isRight()) {
 		Serial.println("Right");         // если был поворот
-
-		trackingSpeed++;
+		
+		/*stepper.stop();
+		stepper.setRunMode(FOLLOW_POS);*/
+		stepper.setSpeed(speed);
+		stepper.setTarget(25, RELATIVE);
 	}
 	if (encoder.isLeft()) {
 		Serial.println("Left");
-
-		trackingSpeed--;
+		
+		/*stepper.stop();
+		stepper.setRunMode(FOLLOW_POS);*/
+		stepper.setSpeed(speed);
+		stepper.setTarget(-25, RELATIVE);
 	}
 
 	if (encoder.isRightH())
 	{
 		Serial.println("Right holded"); // если было удержание + поворот
+
+		trackingSpeed++;
 	}
 	if (encoder.isLeftH())
 	{
 		Serial.println("Left holded");
+
+		trackingSpeed--;
 	}
 
 	//if (enc1.isPress()) Serial.println("Press");         // нажатие на кнопку (+ дебаунс)
@@ -151,21 +185,27 @@ void loop()
 
 	if (encoder.isClick())
 	{
-		Serial.println("Click");         // одиночный клик
+		Serial.println("Click");         // одиночный клик		
 	}
 	if (encoder.isSingle())
 	{
 		Serial.println("Single");       // одиночный клик (с таймаутом для двойного)
+
+		stepper.setRunMode(KEEP_SPEED);
+		stepper.setSpeed(trackingSpeed);
 	}
 	if (encoder.isDouble())
 	{
 		Serial.println("Double");       // двойной клик
+
+		stepper.setRunMode(KEEP_SPEED);
+		stepper.setSpeed(-trackingSpeed);
 	}
 
 
 	if (encoder.isHolded()) {
 		Serial.println("Holded");       // если была удержана и энк не поворачивался
-		EEPROM.update(trackingSpeedEepromAddress, trackingSpeed);
+		saveVars();
 	}
 	//if (enc1.isHold()) Serial.println("Hold");         // возвращает состояние кнопки
 
