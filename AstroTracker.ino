@@ -1,6 +1,6 @@
 #include "timer-api.h"
-#include <AccelStepper.h>
 #include "GyverEncoder.h"
+#include <GyverStepper.h>
 #include <EEPROM.h>
 
 #define encoderCLK	2
@@ -10,9 +10,7 @@
 #define motorPin2 7	// 28BYJ48 pin 2
 #define motorPin3 8	// 28BYJ48 pin 3
 #define motorPin4 9	// 28BYJ48 pin 4
-#define STEPS_PER_REVOLUTION_FULL4WIRE    1019
-#define STEPS_PER_REVOLUTION_HALF4WIRE    2038
-#define STEPPER_MODE    AccelStepper::FULL4WIRE
+#define STEPS_PER_REVOLUTION_HALF4WIRE    2048
 #define MAX_SPEED   1000.0
 
 int counter = 0;
@@ -20,7 +18,10 @@ int currentStateCLK;
 int lastStateCLK;
 String currentDir = "";
 
-AccelStepper stepper(STEPPER_MODE, motorPin1, motorPin3, motorPin2, motorPin4);
+GStepper<STEPPER4WIRE> stepper(STEPS_PER_REVOLUTION_HALF4WIRE, motorPin4, motorPin2, motorPin3, motorPin1);
+// мотор с драйвером ULN2003 подключается по порядку пинов, но крайние нужно поменять местами
+// то есть у меня подключено D2-IN1, D3-IN2, D4-IN3, D5-IN4, но в программе поменял 5 и 2
+
 Encoder encoder(encoderCLK, encoderDT, encoderSW, TYPE2);  // для работы c кнопкой и сразу выбираем тип
 
 float axeleration = 100.0;
@@ -168,24 +169,5 @@ void loop()
 	}
 	//if (enc1.isHold()) Serial.println("Hold");         // возвращает состояние кнопки
 
-	stepper.run();
-
-
-	/*if (stepper.distanceToGo() == 0) {
-		stepper.moveTo(-stepper.currentPosition());
-	}
-	*/
-
-	if (mode == Modes::LEFT) {
-		//stepper.setSpeed(speed);
-		stepper.move(20);
-	}
-	if (mode == Modes::RIGHT) {
-		//stepper.setSpeed(-speed);
-		stepper.move(-20);
-	}
-	if (mode == Modes::TRACKING) {
-		stepper.setSpeed(trackingSpeed);
-		stepper.move(20);
-	}
+	stepper.tick();
 }
