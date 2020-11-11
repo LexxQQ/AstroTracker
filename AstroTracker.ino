@@ -1,7 +1,19 @@
-#include "timer-api.h"
+//#include "timer-api.h"
 #include "GyverEncoder.h"
 #include <GyverStepper.h>
+#include <GyverTimers.h>
 #include <EEPROM.h>
+#include <SPI.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 64 // OLED display height, in pixels
+
+// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
+#define OLED_RESET     4 // Reset pin # (or -1 if sharing Arduino reset pin)
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 #define encoderCLK	2
 #define encoderDT	3
@@ -39,14 +51,66 @@ byte isBlink = false;	// флаг моргания светодиодом
 
 void setup()
 {
-	Serial.println("Init...");
-
-	Serial.begin(115200);
+	/*Serial.begin(115200);*/
+	/*Serial.println("Init...");*/
 
 	initVars();
+	initDisplay();
 	initButtons();
 	initTimers();
 	initStepper();
+}
+
+void initDisplay() {
+	// SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
+	if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {	// 0x3D or 0x3C
+		Serial.println(F("SSD1306 allocation failed"));
+		for (;;); // Don't proceed, loop forever
+	}
+
+	display.clearDisplay();	// Clear the buffer
+
+	//for (int i = 0; i < display.width(); i++)
+	//{
+	//	for (int j = 0; j < display.height(); j++)
+	//	{
+	//		display.drawPixel(i, j, SSD1306_WHITE); // Draw a single pixel in white			
+	//	}		
+	//}	
+
+	display.setTextSize(2);      // Normal 1:1 pixel scale
+	display.setTextColor(SSD1306_WHITE); // Draw white text
+	display.cp437(true);         // Use full 256 char 'Code Page 437' font
+
+	display.setCursor(10, 0);     // Start at top-left corner
+	display.println(F("EQ2 Tr v0"));
+
+	/*for (int16_t i = 0; i < 169; i++) {
+		if (i == '\n') display.write(' ');
+		else          display.write(i);
+	}*/
+
+	/*for (int16_t i = 169; i < 256; i++) {
+		if (i == '\n') display.write(' ');
+		else          display.write(i);
+	}*/
+
+	display.display();	// Show the display buffer on the screen. You MUST call display() after drawing commands to make them visible on screen!
+
+	display.setTextSize(1);
+	display.setCursor(0, 20);
+	display.print(F("Move speed:  "));
+	display.print(speed, 1);
+
+	display.setCursor(0, 30);
+	display.print(F("Track speed: "));
+	display.print(trackingSpeed, 1);
+
+	/*display.setCursor(0, 40);
+	display.print(F("Axeleration: "));
+	display.print(axeleration, 1);*/
+
+	display.display();
 }
 
 void initVars() {
@@ -87,6 +151,7 @@ void saveVars() {
 void isrCLK() {
 	encoder.tick();
 }
+
 void isrDT() {
 	encoder.tick();
 }
@@ -112,10 +177,20 @@ void initTimers() {
 	//timer_init_ISR_100Hz(TIMER_DEFAULT);
 	//timer_init_ISR_50Hz(TIMER_DEFAULT);
 	//timer_init_ISR_20Hz(TIMER_DEFAULT);
-	timer_init_ISR_10Hz(TIMER_DEFAULT);
+	//timer_init_ISR_10Hz(TIMER_DEFAULT);
 	//timer_init_ISR_5Hz(TIMER_DEFAULT);
 	//timer_init_ISR_2Hz(TIMER_DEFAULT);
 	//timer_init_ISR_1Hz(TIMER_DEFAULT);	
+
+	Timer1.setFrequency(1);
+	Timer1.enableISR();
+}
+
+ISR(TIMER1_A) {
+	//display.setCursor(0, 25);
+	//display.print(F("Speed"));
+	///*display.print(speed);*/
+	//display.display();
 }
 
 void initStepper() {
@@ -127,22 +202,24 @@ void initStepper() {
 	stepper.setSpeed(speed);
 }
 
-void timer_handle_interrupts(int timer) {
-	static int blinkDivider = 5;	// дополнильный множитель периода
 
-	static unsigned long prev_time = micros();
 
-	if (isBlink) {
-		digitalWrite(LED_BUILTIN, HIGH);
-
-		if (--blinkDivider < 1) {
-			blinkDivider = 5;
-
-			digitalWrite(LED_BUILTIN, LOW);
-			isBlink = false;
-		}
-	}
-}
+//void timer_handle_interrupts(int timer) {
+//	static int blinkDivider = 5;	// дополнильный множитель периода
+//
+//	static unsigned long prev_time = micros();
+//
+//	if (isBlink) {
+//		digitalWrite(LED_BUILTIN, HIGH);
+//
+//		if (--blinkDivider < 1) {
+//			blinkDivider = 5;
+//
+//			digitalWrite(LED_BUILTIN, LOW);
+//			isBlink = false;			
+//		}
+//	}	
+//}
 
 byte isMoving = false;
 
@@ -157,14 +234,15 @@ void loop()
 		Serial.println("Right");         // если был поворот
 
 		stepper.setRunMode(FOLLOW_POS);
+		stepper.setMaxSpeed(speed);
 		stepper.setTarget(30, RELATIVE);
 	}
 	if (encoder.isLeft()) {
 		Serial.println("Left");
 
 		stepper.setRunMode(FOLLOW_POS);
+		stepper.setMaxSpeed(speed);
 		stepper.setTarget(-30, RELATIVE);
-
 	}
 
 	if (encoder.isRightH())
@@ -187,7 +265,16 @@ void loop()
 
 	if (encoder.isClick())
 	{
-		Serial.println("Click");         // одиночный клик		
+		Serial.println("Click");         // одиночный клик
+
+		if (isMoving) {
+			stepper.stop();
+		}
+		else {
+			stepper.setRunMode(FOLLOW_POS);
+			stepper.setMaxSpeed(speed);
+			stepper.setTarget(30, RELATIVE);
+		}
 	}
 	if (encoder.isSingle())
 	{
