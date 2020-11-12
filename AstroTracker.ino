@@ -312,6 +312,7 @@ void loop()
 	}
 
 	if (encoder.isHolded()) {
+		stepper.stop();
 		saveVars();
 	}
 	//if (enc1.isHold()) Serial.println("Hold");         // возвращает состояние кнопки
