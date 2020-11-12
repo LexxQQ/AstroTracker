@@ -51,9 +51,6 @@ byte isBlink = false;	// флаг моргания светодиодом
 
 void setup()
 {
-	/*Serial.begin(115200);*/
-	/*Serial.println("Init...");*/
-
 	initVars();
 	initDisplay();
 	initButtons();
@@ -64,7 +61,7 @@ void setup()
 void initDisplay() {
 	// SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
 	if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {	// 0x3D or 0x3C
-		Serial.println(F("SSD1306 allocation failed"));
+		//Serial.println(F("SSD1306 allocation failed"));
 		for (;;); // Don't proceed, loop forever
 	}
 
@@ -78,12 +75,8 @@ void initDisplay() {
 	//	}		
 	//}	
 
-	display.setTextSize(2);      // Normal 1:1 pixel scale
 	display.setTextColor(SSD1306_WHITE); // Draw white text
 	display.cp437(true);         // Use full 256 char 'Code Page 437' font
-
-	display.setCursor(10, 0);     // Start at top-left corner
-	display.println(F("EQ2 Tr v0"));
 
 	/*for (int16_t i = 0; i < 169; i++) {
 		if (i == '\n') display.write(' ');
@@ -95,21 +88,10 @@ void initDisplay() {
 		else          display.write(i);
 	}*/
 
-	display.display();	// Show the display buffer on the screen. You MUST call display() after drawing commands to make them visible on screen!
-
-	display.setTextSize(1);
-	display.setCursor(0, 20);
-	display.print(F("Move speed:  "));
-	display.print(speed, 1);
-
-	display.setCursor(0, 30);
-	display.print(F("Track speed: "));
-	display.print(trackingSpeed, 1);
-
-	/*display.setCursor(0, 40);
-	display.print(F("Axeleration: "));
-	display.print(axeleration, 1);*/
-
+	setTitleText(" EQ2 Tr v0");
+	setSpeedText(speed);
+	setTrackingText(trackingSpeed);
+	setStatusText("  Iddle");
 	display.display();
 }
 
@@ -121,31 +103,35 @@ void initVars() {
 	eeAddress += sizeof(float);
 	axeleration = EEPROM.read(eeAddress);
 	eeAddress += sizeof(float);
-
-	Serial.print("axeleration = ");
-	Serial.println(axeleration);
-	Serial.print("speed = ");
-	Serial.println(speed);
-	Serial.print("trackingSpeed = ");
-	Serial.println(trackingSpeed);
 }
 
 void saveVars() {
 	int eeAddress = 0; //EEPROM address to start reading from
-	EEPROM.write(eeAddress, axeleration);
-	eeAddress += sizeof(float);
 	EEPROM.write(eeAddress, speed);
 	eeAddress += sizeof(float);
 	EEPROM.write(eeAddress, trackingSpeed);
 	eeAddress += sizeof(float);
+	EEPROM.write(eeAddress, axeleration);
+	eeAddress += sizeof(float);
 
-	Serial.print("axeleration = ");
-	Serial.println(axeleration);
-	Serial.print("speed = ");
-	Serial.println(speed);
-	Serial.print("trackingSpeed = ");
-	Serial.println(trackingSpeed);
-	Serial.println("Saved!");
+	
+	display.fillRect(0, 50, display.width(), 20, SSD1306_BLACK);
+	
+	display.setTextSize(2);
+	display.setCursor(0, 50);
+
+	for (size_t i = 0; i < 10; i++)
+	{
+		display.write(176);
+		display.display();
+		_delay_ms(40);
+	}
+	
+	display.fillRect(0, 50, display.width(), 20, SSD1306_BLACK);
+
+	setStatusText("  SAVED ");
+	display.write(2);	
+	display.display();
 }
 
 void isrCLK() {
@@ -191,6 +177,7 @@ ISR(TIMER1_A) {
 	//display.print(F("Speed"));
 	///*display.print(speed);*/
 	//display.display();
+	digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
 }
 
 void initStepper() {
@@ -202,62 +189,89 @@ void initStepper() {
 	stepper.setSpeed(speed);
 }
 
+void setTitleText(char* text) {
+	display.fillRect(0, 0, display.width(), 20, SSD1306_BLACK);
+	display.setTextSize(2);
+	display.setCursor(0, 0);
+	display.println(text);
+	display.display();
+}
 
+void setSpeedText(float _speed) {
+	display.fillRect(0, 20, display.width(), 10, SSD1306_BLACK);
+	display.setTextSize(1);
+	display.setCursor(0, 20);
+	display.print(F("Move speed:  "));
+	display.print(_speed, 1);
+	display.display();
+}
 
-//void timer_handle_interrupts(int timer) {
-//	static int blinkDivider = 5;	// дополнильный множитель периода
-//
-//	static unsigned long prev_time = micros();
-//
-//	if (isBlink) {
-//		digitalWrite(LED_BUILTIN, HIGH);
-//
-//		if (--blinkDivider < 1) {
-//			blinkDivider = 5;
-//
-//			digitalWrite(LED_BUILTIN, LOW);
-//			isBlink = false;			
-//		}
-//	}	
-//}
+void setTrackingText(float _trackingSpeed) {
+	display.fillRect(0, 30, display.width(), 10, SSD1306_BLACK);
+	display.setTextSize(1);
+	display.setCursor(0, 30);
+	display.print(F("Track speed: "));
+	display.print(_trackingSpeed, 1);
+	display.display();
+}
 
-byte isMoving = false;
+void setStatusText(char* text) {
+	display.fillRect(0, 50, display.width(), 20, SSD1306_BLACK);
+	display.setTextSize(2);
+	display.setCursor(0, 50);
+	display.print(text);
+	/*display.display();*/
+}
+
+byte isMoving, isShowedStop = false;
 
 void loop()
 {
 	encoder.tick(); // обязательная функция отработки. Должна постоянно опрашиваться
+
 	if (encoder.isTurn()) {     // если был совершён поворот (индикатор поворота в любую сторону)
 		isBlink = true;
 	}
 
 	if (encoder.isRight()) {
-		Serial.println("Right");         // если был поворот
-
 		stepper.setRunMode(FOLLOW_POS);
 		stepper.setMaxSpeed(speed);
 		stepper.setTarget(30, RELATIVE);
-	}
-	if (encoder.isLeft()) {
-		Serial.println("Left");
 
+		setStatusText(" Move ");
+		display.write(2);
+		display.write((uint8_t)0);
+		display.write(175);
+		display.display();
+	}
+
+	if (encoder.isLeft()) {
 		stepper.setRunMode(FOLLOW_POS);
 		stepper.setMaxSpeed(speed);
 		stepper.setTarget(-30, RELATIVE);
+
+		setStatusText(" Move ");
+		display.write(2);
+		display.write((uint8_t)0);
+		display.write(174);
+		display.display();
 	}
 
 	if (encoder.isRightH())
 	{
-		Serial.println("Right holded"); // если было удержание + поворот
-
 		trackingSpeed++;
 		stepper.setSpeed(trackingSpeed);
+
+		setTrackingText(trackingSpeed);
+		display.display();
 	}
+
 	if (encoder.isLeftH())
 	{
-		Serial.println("Left holded");
-
 		trackingSpeed--;
 		stepper.setSpeed(trackingSpeed);
+
+		setTrackingText(trackingSpeed);
 	}
 
 	//if (enc1.isPress()) Serial.println("Press");         // нажатие на кнопку (+ дебаунс)
@@ -265,37 +279,52 @@ void loop()
 
 	if (encoder.isClick())
 	{
-		Serial.println("Click");         // одиночный клик
+		/*if (!isMoving) {
+			stepper.setRunMode(FOLLOW_POS);
+			stepper.setMaxSpeed(speed);
+			stepper.setTarget(30, RELATIVE);
+		}*/
+	}
 
+	if (encoder.isSingle())
+	{
 		if (isMoving) {
 			stepper.stop();
 		}
 		else {
-			stepper.setRunMode(FOLLOW_POS);
-			stepper.setMaxSpeed(speed);
-			stepper.setTarget(30, RELATIVE);
+			stepper.setRunMode(KEEP_SPEED);
+			stepper.setSpeed(trackingSpeed);
+
+			setStatusText("TRACKING ");
+			display.write(175);
+			display.display();
 		}
 	}
-	if (encoder.isSingle())
-	{
-		Serial.println("Single");       // одиночный клик (с таймаутом для двойного)
 
-		stepper.setRunMode(KEEP_SPEED);
-		stepper.setSpeed(trackingSpeed);
-	}
 	if (encoder.isDouble())
 	{
-		Serial.println("Double");       // двойной клик
-
 		stepper.setRunMode(KEEP_SPEED);
 		stepper.setSpeed(-trackingSpeed);
+
+		setStatusText("TRACKING ");
+		display.write(174);
+		display.display();
 	}
 
 	if (encoder.isHolded()) {
-		Serial.println("Holded");       // если была удержана и энк не поворачивался
 		saveVars();
 	}
 	//if (enc1.isHold()) Serial.println("Hold");         // возвращает состояние кнопки
 
 	isMoving = stepper.tick();
+
+	if (isMoving) {
+		isShowedStop = false;
+	}
+	if (!isMoving && !isShowedStop) {
+		isShowedStop = true;
+		setStatusText("  STOP ");
+		display.write(1);
+		display.display();
+	}
 }
