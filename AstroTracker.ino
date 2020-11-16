@@ -24,6 +24,9 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #define motorPin4 9	// 28BYJ48 pin 4
 #define MAX_SPEED   1000.0
 
+#define BEEPER_MINUS	A0
+#define BEEPER_PLUS	A1
+
 int counter = 0;
 int currentStateCLK;
 int lastStateCLK;
@@ -51,11 +54,41 @@ byte isBlink = false;	// флаг моргания светодиодом
 
 void setup()
 {
+	initPorts();
 	initVars();
 	initDisplay();
-	initButtons();
+
 	initTimers();
 	initStepper();
+	// • −−•− ••−−− 
+	const double dot = 100;
+	const double dash = dot * 3;
+	const double pause_char = dot; //	пауза между элементами одного знака — одна точка;
+	const double pause_word = dot * 3; //	пауза между знаками в слове — три точки;
+	const double pause_sentence = dot * 7; //	пауза между словами — семь точек.
+
+	tone(BEEPER_PLUS, 2000, dot);
+	_delay_ms(dot + pause_word);
+
+	tone(BEEPER_PLUS, 2000, dash);
+	_delay_ms(dash + pause_char);
+	tone(BEEPER_PLUS, 2000, dash);
+	_delay_ms(dash + pause_char);
+	tone(BEEPER_PLUS, 2000, dot);
+	_delay_ms(dot + pause_char);
+	tone(BEEPER_PLUS, 2000, dash);
+	_delay_ms(dash + pause_word);
+
+	tone(BEEPER_PLUS, 2000, dot);
+	_delay_ms(dot + pause_char);
+	tone(BEEPER_PLUS, 2000, dot);
+	_delay_ms(dot + pause_char);
+	tone(BEEPER_PLUS, 2000, dash);
+	_delay_ms(dash + pause_char);
+	tone(BEEPER_PLUS, 2000, dash);
+	_delay_ms(dash + pause_char);
+	tone(BEEPER_PLUS, 2000, dash);
+	_delay_ms(dash + pause_word);
 }
 
 void initDisplay() {
@@ -103,6 +136,7 @@ void initVars() {
 	eeAddress += sizeof(float);
 	axeleration = EEPROM.read(eeAddress);
 	eeAddress += sizeof(float);
+
 }
 
 void saveVars() {
@@ -114,9 +148,9 @@ void saveVars() {
 	EEPROM.write(eeAddress, axeleration);
 	eeAddress += sizeof(float);
 
-	
+
 	display.fillRect(0, 50, display.width(), 20, SSD1306_BLACK);
-	
+
 	display.setTextSize(2);
 	display.setCursor(0, 50);
 
@@ -126,12 +160,14 @@ void saveVars() {
 		display.display();
 		_delay_ms(40);
 	}
-	
+
 	display.fillRect(0, 50, display.width(), 20, SSD1306_BLACK);
 
 	setStatusText("  SAVED ");
-	display.write(2);	
+	display.write(2);
 	display.display();
+
+	tone(BEEPER_PLUS, 2000, 500);
 }
 
 void isrCLK() {
@@ -142,8 +178,13 @@ void isrDT() {
 	encoder.tick();
 }
 
-void initButtons() {
+void initPorts() {
 	pinMode(LED_BUILTIN, OUTPUT);
+
+	pinMode(BEEPER_MINUS, OUTPUT);
+	digitalWrite(BEEPER_MINUS, 0);
+	pinMode(BEEPER_PLUS, OUTPUT);
+
 	attachInterrupt(0, isrCLK, CHANGE);
 	attachInterrupt(1, isrDT, CHANGE);
 }
@@ -229,10 +270,6 @@ void loop()
 {
 	encoder.tick(); // обязательная функция отработки. Должна постоянно опрашиваться
 
-	if (encoder.isTurn()) {     // если был совершён поворот (индикатор поворота в любую сторону)
-		isBlink = true;
-	}
-
 	if (encoder.isRight()) {
 		stepper.setRunMode(FOLLOW_POS);
 		stepper.setMaxSpeed(speed);
@@ -243,6 +280,8 @@ void loop()
 		display.write((uint8_t)0);
 		display.write(175);
 		display.display();
+
+		tone(BEEPER_PLUS, 2000, 100);
 	}
 
 	if (encoder.isLeft()) {
@@ -255,6 +294,8 @@ void loop()
 		display.write((uint8_t)0);
 		display.write(174);
 		display.display();
+
+		tone(BEEPER_PLUS, 2000, 100);
 	}
 
 	if (encoder.isRightH())
@@ -263,7 +304,8 @@ void loop()
 		stepper.setSpeed(trackingSpeed);
 
 		setTrackingText(trackingSpeed);
-		display.display();
+		//display.display();			
+		tone(BEEPER_PLUS, 2000, 100);
 	}
 
 	if (encoder.isLeftH())
@@ -272,6 +314,7 @@ void loop()
 		stepper.setSpeed(trackingSpeed);
 
 		setTrackingText(trackingSpeed);
+		tone(BEEPER_PLUS, 2000, 100);
 	}
 
 	//if (enc1.isPress()) Serial.println("Press");         // нажатие на кнопку (+ дебаунс)
@@ -279,11 +322,7 @@ void loop()
 
 	if (encoder.isClick())
 	{
-		/*if (!isMoving) {
-			stepper.setRunMode(FOLLOW_POS);
-			stepper.setMaxSpeed(speed);
-			stepper.setTarget(30, RELATIVE);
-		}*/
+		tone(BEEPER_PLUS, 2000, 100);
 	}
 
 	if (encoder.isSingle())
@@ -315,6 +354,7 @@ void loop()
 		stepper.stop();
 		saveVars();
 	}
+
 	//if (enc1.isHold()) Serial.println("Hold");         // возвращает состояние кнопки
 
 	isMoving = stepper.tick();
