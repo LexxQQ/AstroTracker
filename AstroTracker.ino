@@ -281,7 +281,7 @@ void loop()
 		display.write(175);
 		display.display();
 
-		tone(BEEPER_PLUS, 2000, 100);
+		// tone(BEEPER_PLUS, 2000, 100);
 	}
 
 	if (encoder.isLeft()) {
@@ -295,7 +295,7 @@ void loop()
 		display.write(174);
 		display.display();
 
-		tone(BEEPER_PLUS, 2000, 100);
+		// tone(BEEPER_PLUS, 2000, 100);
 	}
 
 	if (encoder.isRightH())
