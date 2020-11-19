@@ -121,7 +121,7 @@ void initDisplay() {
 		else          display.write(i);
 	}*/
 
-	setTitleText(" EQ2 Tr v0");
+	setTitleText(" EQ2 Tr v1");
 	setSpeedText(speed);
 	setTrackingText(trackingSpeed);
 	setStatusText("  Iddle");
