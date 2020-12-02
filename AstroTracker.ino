@@ -18,10 +18,14 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #define encoderCLK	2
 #define encoderDT	3
 #define encoderSW	4
-#define motorPin1 6 // 28BYJ48 pin 1
-#define motorPin2 7	// 28BYJ48 pin 2
-#define motorPin3 8	// 28BYJ48 pin 3
-#define motorPin4 9	// 28BYJ48 pin 4
+//#define motorPin1 6 // 28BYJ48 pin 1
+//#define motorPin2 7	// 28BYJ48 pin 2
+//#define motorPin3 8	// 28BYJ48 pin 3
+//#define motorPin4 9	// 28BYJ48 pin 4
+#define motorPinSTEP 6
+#define motorPinDIR 7
+#define motorPinENABLE 8
+#define motorPinMODE 9
 #define MAX_SPEED   1000.0
 
 #define BEEPER_MINUS	A0
@@ -32,7 +36,7 @@ int currentStateCLK;
 int lastStateCLK;
 String currentDir = "";
 
-GStepper<STEPPER4WIRE> stepper(2048, motorPin4, motorPin2, motorPin3, motorPin1); // мотор с драйвером ULN2003 подключается по порядку пинов, но крайние нужно поменять местами
+GStepper<STEPPER2WIRE> stepper(48, motorPinSTEP, motorPinDIR, motorPinENABLE); // драйвер step-dir + пин enable
 Encoder encoder(encoderCLK, encoderDT, encoderSW, TYPE2);  // для работы c кнопкой и сразу выбираем тип
 
 float speed = 200.0;	// скорость вращения при "передвижении" влево/вправо
@@ -60,7 +64,9 @@ void setup()
 
 	initTimers();
 	initStepper();
-	// • −−•− ••−−− 
+	
+	/*
+	// • −−•− ••−−−
 	const double dot = 100;
 	const double dash = dot * 3;
 	const double pause_char = dot; //	пауза между элементами одного знака — одна точка;
@@ -88,7 +94,7 @@ void setup()
 	tone(BEEPER_PLUS, 2000, dash);
 	_delay_ms(dash + pause_char);
 	tone(BEEPER_PLUS, 2000, dash);
-	_delay_ms(dash + pause_word);
+	_delay_ms(dash + pause_word);*/
 }
 
 void initDisplay() {
@@ -228,6 +234,9 @@ void initStepper() {
 
 	stepper.setMaxSpeed(MAX_SPEED);
 	stepper.setSpeed(speed);
+
+	pinMode(motorPinMODE, OUTPUT);
+	digitalWrite(motorPinMODE, HIGH);
 }
 
 void setTitleText(char* text) {
