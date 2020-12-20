@@ -34,12 +34,12 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #define BEEPER_MINUS	A0
 #define BEEPER_PLUS	A1
 
-GStepper<STEPPER2WIRE> stepper(48, motorPinSTEP, motorPinDIR, motorPinENABLE); // драйвер step-dir + пин enable
+GStepper<STEPPER2WIRE> stepper(2040, motorPinSTEP, motorPinDIR, motorPinENABLE); // драйвер step-dir + пин enable
 Encoder encoder(encoderCLK, encoderDT, encoderSW, TYPE2);  // для работы c кнопкой и сразу выбираем тип
 
-float speed = 200.0;	// скорость вращения при "передвижении" влево/вправо
+float speed = 4000.0;	// скорость вращения при "передвижении" влево/вправо
 float trackingSpeed = 50.0;	// скорость при "трекинге"
-float axeleration = 100.0;	// ускорение при старте и стопе
+float axeleration = 1000.0;	// ускорение при старте и стопе
 
 //enum Modes
 //{
@@ -134,23 +134,22 @@ void initDisplay() {
 
 void initVars() {
   int eeAddress = 0; //EEPROM address to start reading from
-  speed = EEPROM.read(eeAddress);
+  /*speed = EEPROM.read(eeAddress);
+  eeAddress += sizeof(float);*/
+  EEPROM.get(eeAddress, trackingSpeed);
   eeAddress += sizeof(float);
-  trackingSpeed = EEPROM.read(eeAddress);
-  eeAddress += sizeof(float);
-  axeleration = EEPROM.read(eeAddress);
-  eeAddress += sizeof(float);
-
+  /*axeleration = EEPROM.read(eeAddress);
+  eeAddress += sizeof(float);*/
 }
 
 void saveVars() {
   int eeAddress = 0; //EEPROM address to start reading from
-  EEPROM.write(eeAddress, speed);
+  /*EEPROM.write(eeAddress, speed);
+  eeAddress += sizeof(float);*/
+  EEPROM.put(eeAddress, trackingSpeed);
   eeAddress += sizeof(float);
-  EEPROM.write(eeAddress, trackingSpeed);
-  eeAddress += sizeof(float);
-  EEPROM.write(eeAddress, axeleration);
-  eeAddress += sizeof(float);
+  /*EEPROM.write(eeAddress, axeleration);
+  eeAddress += sizeof(float);*/
 
 
   display.fillRect(0, 50, display.width(), 20, SSD1306_BLACK);
@@ -280,7 +279,7 @@ void loop()
   if (encoder.isRight()) {
     stepper.setRunMode(FOLLOW_POS);
     stepper.setMaxSpeed(speed);
-    stepper.setTarget(30, RELATIVE);
+    stepper.setTarget(speed, RELATIVE);
 
     setStatusText(" Move ");
     display.write(2);
@@ -294,7 +293,7 @@ void loop()
   if (encoder.isLeft()) {
     stepper.setRunMode(FOLLOW_POS);
     stepper.setMaxSpeed(speed);
-    stepper.setTarget(-30, RELATIVE);
+    stepper.setTarget(-speed, RELATIVE);
 
     setStatusText(" Move ");
     display.write(2);
