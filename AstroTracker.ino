@@ -112,6 +112,7 @@ void initDisplay() {
   //	}
   //}
 
+  display.
   display.setTextColor(SSD1306_WHITE); // Draw white text
   display.cp437(true);         // Use full 256 char 'Code Page 437' font
 
