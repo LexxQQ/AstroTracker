@@ -24,22 +24,28 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #define encoderDT	3
 #define encoderSW	4
 
-#define motorPinSTEP 6
-#define motorPinDIR 7
-#define motorPinENABLE 8
-#define motorPinMODE 9
+#define motorPinSTEP	6
+#define motorPinDIR		7
+#define motorPinENABLE	8
 
-#define MAX_SPEED   1000.0
+// Управление микрошаговым режимом.
+// По умолчанию входы притянуты к питанию и выставлен шаг 1 / 8.
+// Для установки полного шага, на оба входа нужно подать низкий уровень, для полушага только на MS2,
+// для 1 / 4 шага, только на MS1. (полный шаг(0, 0), полушаг(1, 0), шаг 1 / 4 (0, 1) и шаг 1 / 8 (1, 1).
+#define motorPinMS1		9	// 9
+#define motorPinMS2		A3	// 22
+
+#define MAX_SPEED		260.0
 
 #define BEEPER_MINUS	A0
-#define BEEPER_PLUS	A1
+#define BEEPER_PLUS		A1
 
 GStepper<STEPPER2WIRE> stepper(2040, motorPinSTEP, motorPinDIR, motorPinENABLE); // драйвер step-dir + пин enable
 Encoder encoder(encoderCLK, encoderDT, encoderSW, TYPE2);  // для работы c кнопкой и сразу выбираем тип
 
-float speed = 4000.0;	// скорость вращения при "передвижении" влево/вправо
+float speed = MAX_SPEED;		// скорость вращения при "передвижении" влево/вправо
 float trackingSpeed = 68.0;	// скорость при "трекинге"
-float axeleration = 1000.0;	// ускорение при старте и стопе
+float axeleration = 150.0;	// ускорение при старте и стопе
 
 //enum Modes
 //{
@@ -52,7 +58,7 @@ float axeleration = 1000.0;	// ускорение при старте и сто�
 //};
 
 //Modes mode = Modes::IDDLE;
-byte isBlink = false;	// флаг моргания светодиодом
+//byte isBlink = false;	// флаг моргания светодиодом
 
 void setup()
 {
@@ -117,7 +123,7 @@ void initDisplay() {
 
 
 	display.setTextColor(SSD1306_WHITE); // Draw white text
-	display.cp437(true);         // Use full 256 char 'Code Page 437' font
+	//display.cp437(true);         // Use full 256 char 'Code Page 437' font
 
 	/*for (int16_t i = 0; i < 169; i++) {
 	  if (i == '\n') display.write(' ');
@@ -220,14 +226,6 @@ void initTimers() {
 	Timer1.enableISR();
 }
 
-ISR(TIMER1_A) {
-	//display.setCursor(0, 25);
-	//display.print(F("Speed"));
-	///*display.print(speed);*/
-	//display.display();
-	digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
-}
-
 void initStepper() {
 	stepper.setMaxSpeed(MAX_SPEED);
 	stepper.autoPower(true);
@@ -236,8 +234,22 @@ void initStepper() {
 	stepper.setMaxSpeed(MAX_SPEED);
 	stepper.setSpeed(speed);
 
-	pinMode(motorPinMODE, OUTPUT);
-	digitalWrite(motorPinMODE, HIGH);
+	pinMode(motorPinMS1, OUTPUT);
+	digitalWrite(motorPinMS1, HIGH);
+
+	pinMode(motorPinMS2, OUTPUT);
+	digitalWrite(motorPinMS2, HIGH);
+}
+
+ISR(TIMER1_A) {
+	//display.setCursor(0, 25);
+	//display.print(F("Speed"));
+	///*display.print(speed);*/
+	//display.display();
+	digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
+
+	/*digitalWrite(motorPinMS1, HIGH);
+	digitalWrite(motorPinMS2, HIGH);*/
 }
 
 void setTitleText(char* text) {
@@ -276,14 +288,25 @@ void setStatusText(char* text) {
 
 byte isMoving, isShowedStop = false;
 
+void SetStepperSpeed(bool isMax) {
+	if (isMax) {
+		digitalWrite(motorPinMS1, LOW);
+		digitalWrite(motorPinMS2, LOW);		
+	}
+	else {
+		digitalWrite(motorPinMS1, HIGH);
+		digitalWrite(motorPinMS2, HIGH);
+	}
+}
+
 void loop()
 {
 	encoder.tick(); // обязательная функция отработки. Должна постоянно опрашиваться
 
 	if (encoder.isRight()) {
-		stepper.setRunMode(FOLLOW_POS);
-		stepper.setMaxSpeed(speed);
-		stepper.setTarget(speed, RELATIVE);
+		stepper.setRunMode(KEEP_SPEED);
+		stepper.setSpeed(speed);
+		SetStepperSpeed(true);
 
 		setStatusText(" Move ");
 		display.write(2);
@@ -295,9 +318,9 @@ void loop()
 	}
 
 	if (encoder.isLeft()) {
-		stepper.setRunMode(FOLLOW_POS);
-		stepper.setMaxSpeed(speed);
-		stepper.setTarget(-speed, RELATIVE);
+		stepper.setRunMode(KEEP_SPEED);
+		stepper.setSpeed(-speed);
+		SetStepperSpeed(true);
 
 		setStatusText(" Move ");
 		display.write(2);
@@ -338,6 +361,7 @@ void loop()
 	if (encoder.isSingle())
 	{
 		if (isMoving) {
+			SetStepperSpeed(false);
 			stepper.stop();
 		}
 		else {
