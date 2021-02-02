@@ -35,7 +35,7 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #define motorPinMS1		9	// 9
 #define motorPinMS2		A3	// 22
 
-#define MAX_SPEED		260.0
+#define MAX_SPEED		255.0
 
 #define BEEPER_MINUS	A0
 #define BEEPER_PLUS		A1
@@ -45,7 +45,7 @@ Encoder encoder(encoderCLK, encoderDT, encoderSW, TYPE2);  // для работ�
 
 float speed = MAX_SPEED;		// скорость вращения при "передвижении" влево/вправо
 float trackingSpeed = 68.0;	// скорость при "трекинге"
-float axeleration = 150.0;	// ускорение при старте и стопе
+float axeleration = 500.0;	// ускорение при старте и стопе
 
 //enum Modes
 //{
@@ -99,6 +99,10 @@ void setup()
 	  _delay_ms(dash + pause_char);
 	  tone(BEEPER_PLUS, 2000, dash);
 	  _delay_ms(dash + pause_word);*/
+
+	tone(BEEPER_PLUS, 3000, 100);
+	_delay_ms(50);
+	tone(BEEPER_PLUS, 3000, 100);
 }
 
 void initDisplay() {
@@ -303,10 +307,10 @@ void loop()
 {
 	encoder.tick(); // обязательная функция отработки. Должна постоянно опрашиваться
 
-	if (encoder.isRight()) {
-		stepper.setRunMode(KEEP_SPEED);
+	if (encoder.isRight()) {		
 		stepper.setSpeed(speed);
 		SetStepperSpeed(true);
+		stepper.setRunMode(KEEP_SPEED);
 
 		setStatusText(" Move ");
 		display.write(2);
@@ -314,13 +318,13 @@ void loop()
 		display.write(175);
 		display.display();
 
-		// tone(BEEPER_PLUS, 2000, 100);
+		 tone(BEEPER_PLUS, 2000, 100);
 	}
 
-	if (encoder.isLeft()) {
-		stepper.setRunMode(KEEP_SPEED);
-		stepper.setSpeed(-speed);
+	if (encoder.isLeft()) {		
+		stepper.setSpeed(-speed);		
 		SetStepperSpeed(true);
+		stepper.setRunMode(KEEP_SPEED);
 
 		setStatusText(" Move ");
 		display.write(2);
@@ -328,12 +332,14 @@ void loop()
 		display.write(174);
 		display.display();
 
-		// tone(BEEPER_PLUS, 2000, 100);
+		 tone(BEEPER_PLUS, 2000, 100);
 	}
 
 	if (encoder.isRightH())
 	{
-		trackingSpeed += 0.5;
+		if (trackingSpeed < speed) {
+			trackingSpeed += 0.5;
+		}
 		stepper.setSpeed(trackingSpeed);
 
 		setTrackingText(trackingSpeed);
@@ -343,7 +349,9 @@ void loop()
 
 	if (encoder.isLeftH())
 	{
-		trackingSpeed -= 0.5;
+		if (trackingSpeed > speed) {
+			trackingSpeed -= 0.5;
+		}
 		stepper.setSpeed(trackingSpeed);
 
 		setTrackingText(trackingSpeed);
@@ -360,13 +368,13 @@ void loop()
 
 	if (encoder.isSingle())
 	{
-		if (isMoving) {
-			SetStepperSpeed(false);
-			stepper.stop();
+		if (isMoving) {			
+			stepper.stop();			
 		}
 		else {
-			stepper.setRunMode(KEEP_SPEED);
+			SetStepperSpeed(false);
 			stepper.setSpeed(trackingSpeed);
+			stepper.setRunMode(KEEP_SPEED);			
 
 			setStatusText("TRACKING ");
 			display.write(175);
