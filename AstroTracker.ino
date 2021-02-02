@@ -100,9 +100,9 @@ void setup()
 	  tone(BEEPER_PLUS, 2000, dash);
 	  _delay_ms(dash + pause_word);*/
 
-	tone(BEEPER_PLUS, 3000, 100);
-	_delay_ms(50);
-	tone(BEEPER_PLUS, 3000, 100);
+	tone(BEEPER_PLUS, 3000, 150);
+	_delay_ms(200);
+	tone(BEEPER_PLUS, 3000, 150);
 }
 
 void initDisplay() {
