@@ -160,7 +160,7 @@ void saveVars() {
 	int eeAddress = 0; //EEPROM address to start reading from
 	/*EEPROM.write(eeAddress, speed);
 	eeAddress += sizeof(float);*/
-	EEPROM.put(eeAddress, trackingSpeed);
+	EEPROM.update(eeAddress, trackingSpeed);
 	eeAddress += sizeof(float);
 	/*EEPROM.write(eeAddress, axeleration);
 	eeAddress += sizeof(float);*/
