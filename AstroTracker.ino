@@ -35,17 +35,24 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #define motorPinMS1		9	// 9
 #define motorPinMS2		A3	// 22
 
-#define MAX_SPEED		255.0
+#define MAX_SPEED		50.0
 
 #define BEEPER_MINUS	A0
 #define BEEPER_PLUS		A1
 
+#define MODE_MOON		0
+#define MODE_STAR		1
+
 GStepper<STEPPER2WIRE> stepper(2040, motorPinSTEP, motorPinDIR, motorPinENABLE); // драйвер step-dir + пин enable
 Encoder encoder(encoderCLK, encoderDT, encoderSW, TYPE2);  // для работы c кнопкой и сразу выбираем тип
 
-float speed = MAX_SPEED;		// скорость вращения при "передвижении" влево/вправо
-float trackingSpeed = 68.0;	// скорость при "трекинге"
-float axeleration = 500.0;	// ускорение при старте и стопе
+struct {
+	float speed = MAX_SPEED;		// скорость вращения при "передвижении" влево/вправо	
+	float axeleration = 500.0;	// ускорение при старте и стопе
+	byte mode = 0; // 0 - moon, 1 - star
+	float MoonSpeed = 85.0;	// скорость при "трекинге" (85 - Луна, x - звезды)
+	float StarSpeed = 25.0;	// скорость при "трекинге" (85 - Луна, x - звезды)
+} settings;
 
 //enum Modes
 //{
@@ -105,6 +112,24 @@ void setup()
 	tone(BEEPER_PLUS, 3000, 150);
 }
 
+float getModeSpeed(byte _mode) {
+	if (_mode == MODE_MOON) {
+		return settings.MoonSpeed;
+	}
+	else {
+		return settings.StarSpeed;
+	}
+}
+
+float setModeSpeed(byte _mode, float _value) {
+	if (_mode == MODE_MOON) {
+		settings.MoonSpeed = _value;
+	}
+	else {
+		settings.StarSpeed = _value;
+	}
+}
+
 void initDisplay() {
 	// SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
 	if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {	// 0x3D or 0x3C
@@ -139,32 +164,38 @@ void initDisplay() {
 		else          display.write(i);
 		}*/
 
-	setTitleText(" EQ2 Tr v2");
-	setSpeedText(speed);
-	setTrackingText(trackingSpeed);
+	setTitleText("EQ2 Tr 2.2");
+	setModeText(settings.mode);
+	//setSpeedText(speed);
+	setTrackingText(getModeSpeed(settings.mode));
 	setStatusText("  Iddle");
 	display.display();
 }
+const uint8_t settingsAddress = 1;
 
 void initVars() {
-	int eeAddress = 0; //EEPROM address to start reading from
+	const uint8_t firstStartFlagAddress = 0;
+	const uint8_t firstStartFlagValue = 'o';
+
+	if (EEPROM.read(firstStartFlagAddress) != firstStartFlagValue) {
+		EEPROM.put(firstStartFlagAddress, firstStartFlagValue);
+		EEPROM.put(settingsAddress, settings);
+	}
+	else {
+		EEPROM.get(settingsAddress, settings);
+	}
+
+	//int eeAddress = 0; //EEPROM address to start reading from
 	/*speed = EEPROM.read(eeAddress);
 	eeAddress += sizeof(float);*/
-	EEPROM.get(eeAddress, trackingSpeed);
-	eeAddress += sizeof(float);
+	//EEPROM.get(eeAddress, getModeSpeed(settings.mode));
+	//eeAddress += sizeof(float);
 	/*axeleration = EEPROM.read(eeAddress);
 	eeAddress += sizeof(float);*/
 }
 
 void saveVars() {
-	int eeAddress = 0; //EEPROM address to start reading from
-	/*EEPROM.write(eeAddress, speed);
-	eeAddress += sizeof(float);*/
-	EEPROM.update(eeAddress, trackingSpeed);
-	eeAddress += sizeof(float);
-	/*EEPROM.write(eeAddress, axeleration);
-	eeAddress += sizeof(float);*/
-
+	EEPROM.put(settingsAddress, settings);
 
 	display.fillRect(0, 50, display.width(), 20, SSD1306_BLACK);
 
@@ -233,10 +264,10 @@ void initTimers() {
 void initStepper() {
 	stepper.setMaxSpeed(MAX_SPEED);
 	stepper.autoPower(true);
-	stepper.setAcceleration(axeleration);
+	stepper.setAcceleration(settings.axeleration);
 
 	stepper.setMaxSpeed(MAX_SPEED);
-	stepper.setSpeed(speed);
+	stepper.setSpeed(settings.speed);
 
 	pinMode(motorPinMS1, OUTPUT);
 	digitalWrite(motorPinMS1, HIGH);
@@ -264,12 +295,26 @@ void setTitleText(char* text) {
 	display.display();
 }
 
-void setSpeedText(float _speed) {
+//void setSpeedText(float _speed) {
+//	display.fillRect(0, 20, display.width(), 10, SSD1306_BLACK);
+//	display.setTextSize(1);
+//	display.setCursor(0, 20);
+//	display.print(F("Move speed:  "));
+//	display.print(_speed * 10, 1);
+//	display.display();
+//}
+
+void setModeText(byte _mode) {
 	display.fillRect(0, 20, display.width(), 10, SSD1306_BLACK);
 	display.setTextSize(1);
 	display.setCursor(0, 20);
-	display.print(F("Move speed:  "));
-	display.print(_speed, 1);
+	display.print(F("Mode:  "));
+	if (_mode == MODE_MOON) {
+		display.print(F("Moon"));
+	}
+	else {
+		display.print(F("Star"));
+	}
 	display.display();
 }
 
@@ -277,7 +322,7 @@ void setTrackingText(float _trackingSpeed) {
 	display.fillRect(0, 30, display.width(), 10, SSD1306_BLACK);
 	display.setTextSize(1);
 	display.setCursor(0, 30);
-	display.print(F("Track speed: "));
+	display.print(F("Speed: "));
 	display.print(_trackingSpeed, 1);
 	display.display();
 }
@@ -295,7 +340,7 @@ byte isMoving, isShowedStop = false;
 void SetStepperSpeed(bool isMax) {
 	if (isMax) {
 		digitalWrite(motorPinMS1, LOW);
-		digitalWrite(motorPinMS2, LOW);		
+		digitalWrite(motorPinMS2, LOW);
 	}
 	else {
 		digitalWrite(motorPinMS1, HIGH);
@@ -307,8 +352,8 @@ void loop()
 {
 	encoder.tick(); // обязательная функция отработки. Должна постоянно опрашиваться
 
-	if (encoder.isRight()) {		
-		stepper.setSpeed(speed);
+	if (encoder.isRight()) {
+		stepper.setSpeed(settings.speed);
 		SetStepperSpeed(true);
 		stepper.setRunMode(KEEP_SPEED);
 
@@ -318,11 +363,11 @@ void loop()
 		display.write(175);
 		display.display();
 
-		 tone(BEEPER_PLUS, 2000, 100);
+		tone(BEEPER_PLUS, 2000, 100);
 	}
 
-	if (encoder.isLeft()) {		
-		stepper.setSpeed(-speed);		
+	if (encoder.isLeft()) {
+		stepper.setSpeed(-settings.speed);
 		SetStepperSpeed(true);
 		stepper.setRunMode(KEEP_SPEED);
 
@@ -332,29 +377,29 @@ void loop()
 		display.write(174);
 		display.display();
 
-		 tone(BEEPER_PLUS, 2000, 100);
+		tone(BEEPER_PLUS, 2000, 100);
 	}
 
 	if (encoder.isRightH())
 	{
-		if (trackingSpeed < speed) {
-			trackingSpeed += 0.5;
+		if (getModeSpeed(settings.mode) < settings.speed) {
+			setModeSpeed(settings.mode, getModeSpeed(settings.mode) + 0.5);
 		}
-		stepper.setSpeed(trackingSpeed);
+		stepper.setSpeed(getModeSpeed(settings.mode));
 
-		setTrackingText(trackingSpeed);
+		setTrackingText(getModeSpeed(settings.mode));
 		//display.display();
 		tone(BEEPER_PLUS, 2000, 100);
 	}
 
 	if (encoder.isLeftH())
 	{
-		if (trackingSpeed > speed) {
-			trackingSpeed -= 0.5;
+		if (getModeSpeed(settings.mode) > settings.speed) {
+			setModeSpeed(settings.mode, getModeSpeed(settings.mode) - 0.5);
 		}
-		stepper.setSpeed(trackingSpeed);
+		stepper.setSpeed(getModeSpeed(settings.mode));
 
-		setTrackingText(trackingSpeed);
+		setTrackingText(getModeSpeed(settings.mode));
 		tone(BEEPER_PLUS, 2000, 100);
 	}
 
@@ -368,13 +413,13 @@ void loop()
 
 	if (encoder.isSingle())
 	{
-		if (isMoving) {			
-			stepper.stop();			
+		if (isMoving) {
+			stepper.stop();
 		}
 		else {
 			SetStepperSpeed(false);
-			stepper.setSpeed(trackingSpeed);
-			stepper.setRunMode(KEEP_SPEED);			
+			stepper.setSpeed(getModeSpeed(settings.mode));
+			stepper.setRunMode(KEEP_SPEED);
 
 			setStatusText("TRACKING ");
 			display.write(175);
@@ -384,11 +429,19 @@ void loop()
 
 	if (encoder.isDouble())
 	{
-		stepper.setRunMode(KEEP_SPEED);
+		/*stepper.setRunMode(KEEP_SPEED);
 		stepper.setSpeed(-trackingSpeed);
 
 		setStatusText("TRACKING ");
 		display.write(174);
+		display.display();*/
+		settings.mode = !settings.mode;
+
+		setTitleText("EQ2 Tr 2.2");
+		setModeText(settings.mode);
+		//setSpeedText(speed);
+		setTrackingText(getModeSpeed(settings.mode));
+		setStatusText("  Iddle");
 		display.display();
 	}
 
